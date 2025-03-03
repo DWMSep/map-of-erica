@@ -1,0 +1,188 @@
+---
+title: "Maps of Erica"
+author: "Duncan Sephton"
+date: "2025-03-03"
+output: html_document
+---
+```{r}
+library(sf)
+library(tidyverse)
+library(lwgeom)
+library(terra)
+library(stars)
+library(exactextractr)
+library(ggplot2)
+library(rinat)
+library(ggspatial)
+library(prettymapr)
+library(leaflet)
+library(htmltools)
+library(wesanderson)
+library(terra)
+library(mapview)
+library(leafpop)
+```
+
+```{r}
+veg <- st_read("SOTER/ZA_SOTERv1.shp")
+veg               
+st_crs(veg)
+class(veg)
+head(veg)
+ggplot() +
+  geom_sf(data=veg, aes(fill = `SOIL`))
+```
+
+
+
+
+
+
+# i want to show the soil types only in the Western Cape between 20e and 22e and 34s to 35s
+```{r}
+myextent <- st_sf(a = 1:2, geom = st_sfc(st_point(c(19,-33.5)), st_point(c(23,-35))), crs = 4326)
+sf_use_s2(FALSE)
+
+vet <- st_crop(veg, myextent)
+
+```
+```{r}
+# plotting
+ggplot() +
+  geom_sf(data=vet, aes(fill = `SOIL`))
+```
+# calling in Inat data
+```{r}
+
+
+eos <- get_inat_obs(taxon_name = "Erica discolor",
+                   bounds = c(-35, 19, -33.5, 22),
+                   maxresults = 1000)
+head(eos)
+eot <- st_as_sf(eos, coords = c("longitude", "latitude"), crs = 4326)
+class(eot)
+ggplot() + 
+  annotation_map_tile(type = "osm", progress = "none") + 
+  geom_sf(data=eot)
+```
+#Filter returned observations by a range of column attribute criteria
+```{r}
+eo <- eos %>% filter(positional_accuracy<46 & 
+                      latitude<0 &
+                      !is.na(latitude) &
+                      captive_cultivated == "false" &
+                      quality_grade == "research")
+
+class(eo)
+```
+#Make the dataframe a spatial object of class = "sf"
+```{r}
+eo <- st_as_sf(eo, coords = c("longitude", "latitude"), crs = 4326)
+class(eo)
+```
+
+#Plot
+```{r}
+ggplot() + geom_sf(data=eo)
+```
+```{r}
+ggplot() + 
+  annotation_map_tile(type = "osm", progress = "none") + 
+  geom_sf(data=eo)
+head(eos)
+eos <- st_as_sf(eo, coords = c("longitude", "latitude"), crs = 4326)
+class(eos)
+ggplot() + 
+  annotation_map_tile(type = "osm", progress = "none") + 
+  geom_sf(data=eos)
+
+
+```
+```{r}
+ep <- get_inat_obs(taxon_name = "Erica oraria",
+                   bounds = c(-35, 19, -33.5, 22),
+                   maxresults = 1000)
+head(ep)
+ept <- st_as_sf(ep, coords = c("longitude", "latitude"), crs = 4326)
+class(ept)
+ggplot() + 
+  annotation_map_tile(type = "osm", progress = "none") + 
+  geom_sf(data=ept)
+
+eps <- ep %>% filter(positional_accuracy<46 & 
+                latitude<0 &
+                !is.na(latitude) &
+                captive_cultivated == "false" &
+                quality_grade == "research")
+
+
+class(eps)
+eps <- st_as_sf(eps, coords = c("longitude", "latitude"), crs = 4326)
+class(eps)
+ggplot() + 
+  annotation_map_tile(type = "osm", progress = "none") + 
+  geom_sf(data=eps)
+
+```
+
+```{r}
+leaflet() %>%
+  # Add default OpenStreetMap map tiles
+  addTiles(group = "Default") %>%  
+  # Add our points
+  addCircleMarkers(data = eo,
+                   group = "Erica discolor",
+                   radius = 3, 
+                   color = "green") %>%
+  addCircleMarkers(data = eps,
+                   group = "Erica oraria",
+                   radius = 3, 
+                   color = "red")
+
+```
+```{r}
+Erica_discolor <- eo
+eor <- Erica_discolor %>%
+  mutate(click_url = paste("<b><a href='", url, "'>Link to iNat observation</a></b>"))
+
+mapview(Erica_discolor, 
+        popup = 
+          popupTable(eor,
+            zcol = c("user_login", "captive_cultivated", "click_url")))
+```
+```{r}
+
+
+pal <- wes_palette("Darjeeling1", 9, type = "continuous")
+
+vegr <- st_read("SOTER/ZA_SOTERv1.shp")
+hmm <- st_intersection(eo, vegr)
+st_crs(eo)
+st_crs(vegr)
+dim(eo)
+
+
+
+ggplot() + 
+  annotation_map_tile(type = "osm", progress = "none") + 
+  geom_sf(data=hmm, aes(col = SOIL)) +
+  scale_colour_manual(values = pal)
+
+```
+```{r}
+hmt <- st_intersection(eps, vegr)
+ggplot() + 
+  annotation_map_tile(type = "osm", progress = "none") + 
+  geom_sf(data=hmt, aes(col = SOIL)) +
+  scale_colour_manual(values = pal)
+```
+
+ 
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
