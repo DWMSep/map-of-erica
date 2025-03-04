@@ -4,6 +4,7 @@ author: "Duncan Sephton"
 date: "2025-03-03"
 output: html_document
 ---
+#Packages used:
 ```{r}
 library(sf)
 library(tidyverse)
@@ -18,17 +19,18 @@ library(prettymapr)
 library(leaflet)
 library(htmltools)
 library(wesanderson)
-library(terra)
 library(mapview)
 library(leafpop)
 ```
-
+# Reading in the data for soil map of South Africa:
 ```{r}
 veg <- st_read("SOTER/ZA_SOTERv1.shp")
 veg               
 st_crs(veg)
 class(veg)
 head(veg)
+
+# Plotting the map
 ggplot() +
   geom_sf(data=veg, aes(fill = `SOIL`))
 ```
@@ -38,7 +40,7 @@ ggplot() +
 
 
 
-# i want to show the soil types only in the Western Cape between 20e and 22e and 34s to 35s
+# Cropping the data to the extent of the area I know the species that I'll use are located in:
 ```{r}
 myextent <- st_sf(a = 1:2, geom = st_sfc(st_point(c(19,-33.5)), st_point(c(23,-35))), crs = 4326)
 sf_use_s2(FALSE)
@@ -46,143 +48,139 @@ sf_use_s2(FALSE)
 vet <- st_crop(veg, myextent)
 
 ```
+Plotting Cropped Data
 ```{r}
-# plotting
+# plotting the cropped data for soil data
 ggplot() +
   geom_sf(data=vet, aes(fill = `SOIL`))
 ```
-# calling in Inat data
+
+
+
+
+# Data for Erica discolor:
+### Erica discolor data pulled in from iNat
 ```{r}
-
-
+# collecting iNat data
 eos <- get_inat_obs(taxon_name = "Erica discolor",
                    bounds = c(-35, 19, -33.5, 22),
                    maxresults = 1000)
-head(eos)
+
 eot <- st_as_sf(eos, coords = c("longitude", "latitude"), crs = 4326)
-class(eot)
+
+# mapping raw data
 ggplot() + 
   annotation_map_tile(type = "osm", progress = "none") + 
   geom_sf(data=eot)
-```
-#Filter returned observations by a range of column attribute criteria
-```{r}
+
+#Filtering 
 eo <- eos %>% filter(positional_accuracy<46 & 
                       latitude<0 &
                       !is.na(latitude) &
                       captive_cultivated == "false" &
                       quality_grade == "research")
-
-class(eo)
-```
-#Make the dataframe a spatial object of class = "sf"
-```{r}
 eo <- st_as_sf(eo, coords = c("longitude", "latitude"), crs = 4326)
-class(eo)
-```
 
-#Plot
-```{r}
-ggplot() + geom_sf(data=eo)
-```
-```{r}
+
+#Plotting the filtered data
 ggplot() + 
   annotation_map_tile(type = "osm", progress = "none") + 
   geom_sf(data=eo)
-head(eos)
-eos <- st_as_sf(eo, coords = c("longitude", "latitude"), crs = 4326)
-class(eos)
-ggplot() + 
-  annotation_map_tile(type = "osm", progress = "none") + 
-  geom_sf(data=eos)
 
 
 ```
+
+
+
+
+
+#Mapping Erica oraria:
+### Erica oraria pulled in from iNat
 ```{r}
+# collecting iNat data
 ep <- get_inat_obs(taxon_name = "Erica oraria",
                    bounds = c(-35, 19, -33.5, 22),
                    maxresults = 1000)
-head(ep)
+# mapping the raw data
+
 ept <- st_as_sf(ep, coords = c("longitude", "latitude"), crs = 4326)
-class(ept)
+
 ggplot() + 
   annotation_map_tile(type = "osm", progress = "none") + 
   geom_sf(data=ept)
 
+# Filtering iNat data for only research grade observations
 eps <- ep %>% filter(positional_accuracy<46 & 
                 latitude<0 &
                 !is.na(latitude) &
                 captive_cultivated == "false" &
                 quality_grade == "research")
 
+# mapping with research grade observations
 
-class(eps)
 eps <- st_as_sf(eps, coords = c("longitude", "latitude"), crs = 4326)
-class(eps)
+
 ggplot() + 
   annotation_map_tile(type = "osm", progress = "none") + 
   geom_sf(data=eps)
 
 ```
 
-```{r}
-leaflet() %>%
-  # Add default OpenStreetMap map tiles
-  addTiles(group = "Default") %>%  
-  # Add our points
-  addCircleMarkers(data = eo,
-                   group = "Erica discolor",
-                   radius = 3, 
-                   color = "green") %>%
-  addCircleMarkers(data = eps,
-                   group = "Erica oraria",
-                   radius = 3, 
-                   color = "red")
 
-```
+
+
+
+# Connecting the iNat data to the iNat site with a URL while also mapping for both Inat species:
 ```{r}
-Erica_discolor <- eo
-eor <- Erica_discolor %>%
+# Linking the url for Inat
+eor <- eo %>%
   mutate(click_url = paste("<b><a href='", url, "'>Link to iNat observation</a></b>"))
 
-mapview(Erica_discolor, 
+# Erica discolor map
+eot <- mapview(eo,
+        layer.name = c("Erica discolor"),
+        
+        col.regions = c("#7680BB"), 
         popup = 
           popupTable(eor,
-            zcol = c("user_login", "captive_cultivated", "click_url")))
-```
-```{r}
+            zcol = c("scientific_name", "click_url")))
+# Linking the url for Inat
+epts <- eps %>%
+  mutate(click_url = paste("<b><a href='", url, "'>Link to iNat observation</a></b>"))
 
+# Erica oraria map
+ept <- mapview(eps,
+        layer.name = c("Erica oraria"),
+        
+        col.regions = c("#F8805D"),
+        popup = 
+          popupTable(epts,
+            zcol = c("scientific_name", "click_url")))
+
+# Combing maps
+mapv <- ept + eot 
+
+
+```
+# Making an Interactive Soil map:
+```{r}
 
 pal <- wes_palette("Darjeeling1", 9, type = "continuous")
 
-vegr <- st_read("SOTER/ZA_SOTERv1.shp")
-hmm <- st_intersection(eo, vegr)
-st_crs(eo)
-st_crs(vegr)
-dim(eo)
-
-
-
-ggplot() + 
-  annotation_map_tile(type = "osm", progress = "none") + 
-  geom_sf(data=hmm, aes(col = SOIL)) +
-  scale_colour_manual(values = pal)
-
+Bio <- mapview(vet, 
+              zcol = ("SOIL"),
+             popup = 
+          popupTable(vet,
+            zcol = c("SOIL")))
 ```
+# Combining soil and iNat maps to make the final map:
 ```{r}
-hmt <- st_intersection(eps, vegr)
-ggplot() + 
-  annotation_map_tile(type = "osm", progress = "none") + 
-  geom_sf(data=hmt, aes(col = SOIL)) +
-  scale_colour_manual(values = pal)
+Bio + mapv
 ```
 
- 
 
 
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+
 
 
